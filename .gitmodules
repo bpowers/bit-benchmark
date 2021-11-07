@@ -1,0 +1,10 @@
+[submodule "third_party/zstd"]
+	path = third_party/zstd
+	url = https://github.com/facebook/zstd
+	branch = release
+[submodule "third_party/snappy"]
+	path = third_party/snappy
+	url = https://github.com/google/snappy
+[submodule "third_party/sparkey"]
+	path = third_party/sparkey
+	url = https://github.com/spotify/sparkey
