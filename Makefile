@@ -12,7 +12,7 @@ LIBS             = $(ZSTD_LIB) $(SNAPPY_LIB) $(SPARKEY_LIB)
 
 ALL_SUBMODULES   = $(SPARKEY) $(SNAPPY) $(ZSTD)
 
-CGO_ENV          = CGO_LDFLAGS="-L$(PREFIX)/lib -l$(SPARKEY_LIB) -l$(ZSTD_LIB) -l$(SNAPPY_LIB)" CGO_CFLAGS="-I$(PREFIX)/include"
+CGO_ENV          = CGO_LDFLAGS="-L$(PREFIX)/lib -l$(CXX_LIB) $(SPARKEY_LIB) $(ZSTD_LIB) $(SNAPPY_LIB)" CGO_CFLAGS="-I$(PREFIX)/include"
 
 CONFIG           = Makefile go.mod go.sum
 
