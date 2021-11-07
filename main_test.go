@@ -15,12 +15,14 @@ import (
 
 	"github.com/bpowers/bit"
 	"github.com/bsm/go-sparkey"
+	"github.com/colinmarc/cdb"
 )
 
 var (
 	benchTableOnce    sync.Once
 	benchTableBit     *bit.Table
 	benchTableSparkey *sparkey.HashReader
+	benchTableCdb     *cdb.CDB
 	benchHashmap      map[string]string
 	benchEntries      []benchEntry
 )
@@ -30,75 +32,23 @@ type benchEntry struct {
 	Value string
 }
 
-var keyBuf []byte
-var valueBuf []byte
-
 func loadBenchTable() {
-	var err error
-	var expected map[string]string
-	benchTableBit, benchTableSparkey, expected, err = openTestFile("testdata.large")
-	if err != nil {
-		panic(err)
-	}
-
-	for k, v := range expected {
-		benchEntries = append(benchEntries, benchEntry{Key: k, Value: v})
-	}
-
-	benchHashmap = make(map[string]string)
-	for _, entry := range benchEntries {
-		keyBuf = make([]byte, len(entry.Key))
-		copy(keyBuf, entry.Key)
-		valueBuf = make([]byte, len(entry.Value))
-		copy(valueBuf, entry.Value)
-		// attempt to ensure the hashmap doesn't share memory with our test oracle
-		benchHashmap[string(keyBuf)] = string(valueBuf)
-	}
+	testData := "testdata.large"
+	benchTableBit = createBitTable(testData)
+	benchTableSparkey = createSparkeyTable(testData)
+	benchTableCdb = createCdbTable(testData)
+	benchHashmap = createInMemoryTable(testData)
+	benchEntries = createEntriesTable(testData)
 }
 
-func openTestFile(path string) (*bit.Table, *sparkey.HashReader, map[string]string, error) {
+func streamTestFile(path string, put func(key, value []byte)) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, nil, nil, err
+		panic(err)
 	}
 	defer func() {
 		_ = f.Close()
 	}()
-
-	bitDataFile, err := os.CreateTemp("", "bit-test.*.data")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	defer func() {
-		_ = os.Remove(bitDataFile.Name())
-		_ = os.Remove(bitDataFile.Name() + ".index")
-	}()
-	if err = bitDataFile.Close(); err != nil {
-		return nil, nil, nil, err
-	}
-	if err = os.Remove(bitDataFile.Name()); err != nil {
-		return nil, nil, nil, err
-	}
-
-	builder, err := bit.NewBuilder(bitDataFile.Name())
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	sparkeyDataFile, err := os.CreateTemp("", "sparkey-test.*.data")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	_ = os.Remove(sparkeyDataFile.Name())
-	_ = sparkeyDataFile.Close() // close it; we just want the name
-	defer func() {
-		_ = os.Remove(sparkeyDataFile.Name())
-		_ = os.Remove(sparkeyDataFile.Name() + ".idx")
-	}()
-
-	sparkeyWriter, err := sparkey.CreateLogWriter(sparkeyDataFile.Name(), nil)
-
-	known := make(map[string]string)
 
 	s := bufio.NewScanner(bufio.NewReaderSize(f, 16*1024))
 	for s.Scan() {
@@ -107,38 +57,151 @@ func openTestFile(path string) (*bit.Table, *sparkey.HashReader, map[string]stri
 		if !ok {
 			panic("input file unexpected shape")
 		}
-		err := builder.Put(k, v)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		err = sparkeyWriter.Put(k, v)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		known[string(k)] = string(v)
+		put(k, v)
 	}
+}
+
+func createInMemoryTable(testDataPath string) map[string]string {
+	data := make(map[string]string)
+
+	streamTestFile(testDataPath, func(k, v []byte) {
+		data[string(k)] = string(v)
+
+	})
+
+	return data
+}
+
+func createEntriesTable(testDataPath string) []benchEntry {
+	data := make(map[string]string)
+
+	streamTestFile(testDataPath, func(k, v []byte) {
+		data[string(k)] = string(v)
+	})
+
+	// we build it this way to ensure the list of entries is randomized and _doesn't_
+	// match the order we wrote entries to the log files for the tables.
+	entries := make([]benchEntry, 0, len(data))
+	for k, v := range data {
+		entries = append(entries, benchEntry{Key: k, Value: v})
+	}
+
+	return entries
+}
+
+func createBitTable(testDataPath string) *bit.Table {
+	tableFile, err := os.CreateTemp("", "bit-test.*.data")
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = os.Remove(tableFile.Name())
+		_ = os.Remove(tableFile.Name() + ".index")
+	}()
+	if err = tableFile.Close(); err != nil {
+		panic(err)
+	}
+	if err = os.Remove(tableFile.Name()); err != nil {
+		panic(err)
+	}
+
+	builder, err := bit.NewBuilder(tableFile.Name())
+	if err != nil {
+		panic(err)
+	}
+
+	streamTestFile(testDataPath, func(k, v []byte) {
+		if err := builder.Put(k, v); err != nil {
+			panic(err)
+		}
+	})
 
 	table, err := builder.Finalize()
 	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	if err := sparkeyWriter.Flush(); err != nil {
-		panic(err)
-	}
-	if err := sparkeyWriter.WriteHashFile(sparkey.HASH_SIZE_AUTO); err != nil {
-		panic(err)
-	}
-	if err := sparkeyWriter.Close(); err != nil {
 		panic(err)
 	}
 
-	sparkeyTable, err := sparkey.Open(sparkeyDataFile.Name())
+	return table
+}
+
+func createSparkeyTable(testDataPath string) *sparkey.HashReader {
+	tableFile, err := os.CreateTemp("", "bit-test.*.data")
 	if err != nil {
-		return nil, nil, nil, err
+		panic(err)
+	}
+	defer func() {
+		_ = os.Remove(tableFile.Name())
+		_ = os.Remove(tableFile.Name() + ".index")
+	}()
+	if err = tableFile.Close(); err != nil {
+		panic(err)
+	}
+	if err = os.Remove(tableFile.Name()); err != nil {
+		panic(err)
 	}
 
-	return table, sparkeyTable, known, nil
+	builder, err := sparkey.CreateLogWriter(tableFile.Name(), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	streamTestFile(testDataPath, func(k, v []byte) {
+		if err := builder.Put(k, v); err != nil {
+			panic(err)
+		}
+	})
+
+	if err := builder.Flush(); err != nil {
+		panic(err)
+	}
+	if err := builder.WriteHashFile(sparkey.HASH_SIZE_AUTO); err != nil {
+		panic(err)
+	}
+	if err := builder.Close(); err != nil {
+		panic(err)
+	}
+
+	table, err := sparkey.Open(tableFile.Name())
+	if err != nil {
+		panic(err)
+	}
+
+	return table
+}
+
+func createCdbTable(testDataPath string) *cdb.CDB {
+	tableFile, err := os.CreateTemp("", "bit-test.*.data")
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = os.Remove(tableFile.Name())
+		_ = os.Remove(tableFile.Name() + ".index")
+	}()
+	if err = tableFile.Close(); err != nil {
+		panic(err)
+	}
+	if err = os.Remove(tableFile.Name()); err != nil {
+		panic(err)
+	}
+
+	builder, err := cdb.Create(tableFile.Name())
+	if err != nil {
+		panic(err)
+	}
+
+	streamTestFile(testDataPath, func(k, v []byte) {
+		if err := builder.Put(k, v); err != nil {
+			panic(err)
+		}
+	})
+
+	table, err := builder.Freeze()
+	if err != nil {
+		panic(err)
+	}
+
+	return table
 }
 
 func BenchmarkBit(b *testing.B) {
@@ -170,6 +233,21 @@ func BenchmarkSparkey(b *testing.B) {
 		j := i % len(benchEntries)
 		entry := benchEntries[j]
 		value, err := iter.Get(toBytes(entry.Key))
+		if err != nil || string(value) != entry.Value {
+			b.Fatal("bad data or lookup")
+		}
+	}
+}
+
+func BenchmarkCdb(b *testing.B) {
+	benchTableOnce.Do(loadBenchTable)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		j := i % len(benchEntries)
+		entry := benchEntries[j]
+		value, err := benchTableCdb.Get(toBytes(entry.Key))
 		if err != nil || string(value) != entry.Value {
 			b.Fatal("bad data or lookup")
 		}
