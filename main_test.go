@@ -18,6 +18,8 @@ import (
 	"github.com/colinmarc/cdb"
 )
 
+const testData = "testdata.large"
+
 var (
 	benchTableOnce    sync.Once
 	benchTableBit     *bit.Table
@@ -33,7 +35,6 @@ type benchEntry struct {
 }
 
 func loadBenchTable() {
-	testData := "testdata.large"
 	benchTableBit = createBitTable(testData)
 	benchTableSparkey = createSparkeyTable(testData)
 	benchTableCdb = createCdbTable(testData)
@@ -283,4 +284,51 @@ func toBytes(s string) (b []byte) {
 	bh.Len = sh.Len
 	bh.Cap = sh.Len
 	return b
+}
+
+var (
+	benchTableBitCreate     *bit.Table
+	benchTableSparkeyCreate *sparkey.HashReader
+	benchTableCdbCreate     *cdb.CDB
+)
+
+func BenchmarkBitCreate(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchTableBitCreate = createBitTable(testData)
+		if benchTableBitCreate == nil {
+			b.Fatal("bad data or lookup")
+		}
+	}
+}
+
+func BenchmarkSparkeyCreate(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchTableSparkeyCreate = createSparkeyTable(testData)
+		if benchTableSparkeyCreate == nil {
+			b.Fatal("bad data or lookup")
+		}
+	}
+}
+
+
+func BenchmarkCdbCreate(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchTableCdbCreate = createCdbTable(testData)
+		if benchTableCdbCreate == nil {
+			b.Fatal("bad data or lookup")
+		}
+	}
+}
+
+func TestBitTableCreate(t *testing.T) {
+	table := createBitTable(testData)
+	if table == nil {
+		t.Fatal("expected table to be non-nil")
+	}
 }
