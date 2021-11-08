@@ -22,12 +22,13 @@ import (
 const testData = "testdata.large"
 
 var (
-	benchTableOnce    sync.Once
-	benchTableBit     *bit.Table
-	benchTableSparkey *sparkey.HashReader
-	benchTableCdb     *cdb.CDB
-	benchHashmap      map[string]string
-	benchEntries      []benchEntry
+	benchTableOnce                sync.Once
+	benchTableBit                 *bit.Table
+	benchTableSparkeyUncompressed *sparkey.HashReader
+	// benchTableSparkeySnappy       *sparkey.HashReader
+	benchTableCdb *cdb.CDB
+	benchHashmap  map[string]string
+	benchEntries  []benchEntry
 )
 
 type benchEntry struct {
@@ -37,7 +38,8 @@ type benchEntry struct {
 
 func loadBenchTable() {
 	benchTableBit = createBitTable(testData)
-	benchTableSparkey = createSparkeyTable(testData)
+	benchTableSparkeyUncompressed = createSparkeyTable(testData, false)
+	// benchTableSparkeySnappy = createSparkeyTable(testData, true)
 	benchTableCdb = createCdbTable(testData)
 	benchHashmap = createInMemoryTable(testData)
 	benchEntries = createEntriesTable(testData)
@@ -126,7 +128,7 @@ func createBitTable(testDataPath string) *bit.Table {
 	return table
 }
 
-func createSparkeyTable(testDataPath string) *sparkey.HashReader {
+func createSparkeyTable(testDataPath string, compressedWithSnappy bool) *sparkey.HashReader {
 	tableFile, err := os.CreateTemp("", "bit-test.*.data")
 	if err != nil {
 		panic(err)
@@ -142,7 +144,11 @@ func createSparkeyTable(testDataPath string) *sparkey.HashReader {
 		panic(err)
 	}
 
-	builder, err := sparkey.CreateLogWriter(tableFile.Name(), nil)
+	var opts *sparkey.Options
+	if compressedWithSnappy {
+		opts.Compression = sparkey.COMPRESSION_SNAPPY
+	}
+	builder, err := sparkey.CreateLogWriter(tableFile.Name(), opts)
 	if err != nil {
 		panic(err)
 	}
@@ -206,7 +212,7 @@ func createCdbTable(testDataPath string) *cdb.CDB {
 	return table
 }
 
-func BenchmarkBit(b *testing.B) {
+func BenchmarkBitGet(b *testing.B) {
 	benchTableOnce.Do(loadBenchTable)
 
 	b.ReportAllocs()
@@ -225,13 +231,57 @@ func BenchmarkBit(b *testing.B) {
 	})
 }
 
-func BenchmarkSparkey(b *testing.B) {
+func BenchmarkMapGet(b *testing.B) {
 	benchTableOnce.Do(loadBenchTable)
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	b.RunParallel(func(b *testing.PB) {
-		iter, err := benchTableSparkey.Iterator()
+		entryCount := len(benchEntries)
+		i := rand.Int() % entryCount
+		for b.Next() {
+			entry := benchEntries[i]
+			value, ok := benchHashmap[entry.Key]
+			if !ok || value != entry.Value {
+				panic("bad data or lookup")
+			}
+			i = (i + 1) % entryCount
+		}
+	})
+}
+
+//func BenchmarkSparkeySnappyGet(b *testing.B) {
+//	benchTableOnce.Do(loadBenchTable)
+//
+//	b.ReportAllocs()
+//	b.ResetTimer()
+//	b.RunParallel(func(b *testing.PB) {
+//		iter, err := benchTableSparkeySnappy.Iterator()
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		entryCount := len(benchEntries)
+//		i := rand.Int() % entryCount
+//		for b.Next() {
+//			entry := benchEntries[i]
+//			value, err := iter.Get(toBytes(entry.Key))
+//			if err != nil || string(value) != entry.Value {
+//				panic("bad data or lookup")
+//			}
+//
+//			i = (i + 1) % entryCount
+//		}
+//	})
+//}
+
+func BenchmarkSparkeyUncompressedGet(b *testing.B) {
+	benchTableOnce.Do(loadBenchTable)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(b *testing.PB) {
+		iter, err := benchTableSparkeyUncompressed.Iterator()
 		if err != nil {
 			panic(err)
 		}
@@ -250,7 +300,7 @@ func BenchmarkSparkey(b *testing.B) {
 	})
 }
 
-func BenchmarkCdb(b *testing.B) {
+func BenchmarkCdbGet(b *testing.B) {
 	benchTableOnce.Do(loadBenchTable)
 
 	b.ReportAllocs()
@@ -262,25 +312,6 @@ func BenchmarkCdb(b *testing.B) {
 			entry := benchEntries[i]
 			value, err := benchTableCdb.Get(toBytes(entry.Key))
 			if err != nil || string(value) != entry.Value {
-				panic("bad data or lookup")
-			}
-			i = (i + 1) % entryCount
-		}
-	})
-}
-
-func BenchmarkHashmap(b *testing.B) {
-	benchTableOnce.Do(loadBenchTable)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.RunParallel(func(b *testing.PB) {
-		entryCount := len(benchEntries)
-		i := rand.Int() % entryCount
-		for b.Next() {
-			entry := benchEntries[i]
-			value, ok := benchHashmap[entry.Key]
-			if !ok || value != entry.Value {
 				panic("bad data or lookup")
 			}
 			i = (i + 1) % entryCount
@@ -321,16 +352,27 @@ func BenchmarkBitCreate(b *testing.B) {
 	}
 }
 
-func BenchmarkSparkeyCreate(b *testing.B) {
+func BenchmarkSparkeyCreateUncompressed(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		benchTableSparkeyCreate = createSparkeyTable(testData)
+		benchTableSparkeyCreate = createSparkeyTable(testData, false)
 		if benchTableSparkeyCreate == nil {
 			b.Fatal("bad data or lookup")
 		}
 	}
 }
+
+//func BenchmarkSparkeyCreateSnappy(b *testing.B) {
+//	b.ReportAllocs()
+//	b.ResetTimer()
+//	for i := 0; i < b.N; i++ {
+//		benchTableSparkeyCreate = createSparkeyTable(testData, true)
+//		if benchTableSparkeyCreate == nil {
+//			b.Fatal("bad data or lookup")
+//		}
+//	}
+//}
 
 func BenchmarkCdbCreate(b *testing.B) {
 	b.ReportAllocs()

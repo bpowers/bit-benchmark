@@ -3,7 +3,7 @@ module github.com/bpowers/bit-benchmark
 go 1.18
 
 require (
-	github.com/bpowers/bit v0.0.0-20211107055241-a2b1cad460e6
+	github.com/bpowers/bit v0.0.0-20211108065132-2fd689ee9671
 	github.com/bsm/go-sparkey v0.0.0-20160321124439-66bee8aff699
 	github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70
 )

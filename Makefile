@@ -58,7 +58,8 @@ lib: $(LIBS)
 
 test: lib
 	@echo "  TEST  $@"
-	$(CGO_ENV) go test -bench=.
+	$(CGO_ENV) go test -bench=.Get -cpu 1,2,4,8
+	$(CGO_ENV) go test -bench=.Create
 
 
 
