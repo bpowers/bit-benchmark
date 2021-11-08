@@ -7,6 +7,7 @@ package bitbenchmark
 import (
 	"bufio"
 	"bytes"
+	"math/rand"
 	"os"
 	"reflect"
 	"sync"
@@ -210,34 +211,43 @@ func BenchmarkBit(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		j := i % len(benchEntries)
-		entry := benchEntries[j]
-		value, ok := benchTableBit.GetString(entry.Key)
-		if !ok || string(value) != entry.Value {
-			b.Fatal("bad data or lookup")
+	b.RunParallel(func(b *testing.PB) {
+		entryCount := len(benchEntries)
+		i := rand.Int() % entryCount
+		for b.Next() {
+			entry := benchEntries[i]
+			value, ok := benchTableBit.GetString(entry.Key)
+			if !ok || string(value) != entry.Value {
+				panic("bad data or lookup")
+			}
+			i = (i + 1) % entryCount
 		}
-	}
+	})
 }
 
 func BenchmarkSparkey(b *testing.B) {
 	benchTableOnce.Do(loadBenchTable)
 
-	iter, err := benchTableSparkey.Iterator()
-	if err != nil {
-		panic(err)
-	}
-
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		j := i % len(benchEntries)
-		entry := benchEntries[j]
-		value, err := iter.Get(toBytes(entry.Key))
-		if err != nil || string(value) != entry.Value {
-			b.Fatal("bad data or lookup")
+	b.RunParallel(func(b *testing.PB) {
+		iter, err := benchTableSparkey.Iterator()
+		if err != nil {
+			panic(err)
 		}
-	}
+
+		entryCount := len(benchEntries)
+		i := rand.Int() % entryCount
+		for b.Next() {
+			entry := benchEntries[i]
+			value, err := iter.Get(toBytes(entry.Key))
+			if err != nil || string(value) != entry.Value {
+				panic("bad data or lookup")
+			}
+
+			i = (i + 1) % entryCount
+		}
+	})
 }
 
 func BenchmarkCdb(b *testing.B) {
@@ -245,14 +255,18 @@ func BenchmarkCdb(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		j := i % len(benchEntries)
-		entry := benchEntries[j]
-		value, err := benchTableCdb.Get(toBytes(entry.Key))
-		if err != nil || string(value) != entry.Value {
-			b.Fatal("bad data or lookup")
+	b.RunParallel(func(b *testing.PB) {
+		entryCount := len(benchEntries)
+		i := rand.Int() % entryCount
+		for b.Next() {
+			entry := benchEntries[i]
+			value, err := benchTableCdb.Get(toBytes(entry.Key))
+			if err != nil || string(value) != entry.Value {
+				panic("bad data or lookup")
+			}
+			i = (i + 1) % entryCount
 		}
-	}
+	})
 }
 
 func BenchmarkHashmap(b *testing.B) {
@@ -260,14 +274,18 @@ func BenchmarkHashmap(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		j := i % len(benchEntries)
-		entry := benchEntries[j]
-		value, ok := benchHashmap[entry.Key]
-		if !ok || value != entry.Value {
-			b.Fatal("bad data or lookup")
+	b.RunParallel(func(b *testing.PB) {
+		entryCount := len(benchEntries)
+		i := rand.Int() % entryCount
+		for b.Next() {
+			entry := benchEntries[i]
+			value, ok := benchHashmap[entry.Key]
+			if !ok || value != entry.Value {
+				panic("bad data or lookup")
+			}
+			i = (i + 1) % entryCount
 		}
-	}
+	})
 }
 
 // toBytes returns a byte slice aliasing to the contents of the input string.
@@ -313,7 +331,6 @@ func BenchmarkSparkeyCreate(b *testing.B) {
 		}
 	}
 }
-
 
 func BenchmarkCdbCreate(b *testing.B) {
 	b.ReportAllocs()
