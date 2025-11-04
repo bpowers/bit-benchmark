@@ -15,16 +15,14 @@ import (
 	"unsafe"
 
 	"github.com/bpowers/bit"
-	"github.com/bsm/go-sparkey"
 	"github.com/colinmarc/cdb"
 )
 
 const testData = "testdata.large"
 
 var (
-	benchTableOnce                sync.Once
-	benchTableBit                 *bit.Table
-	benchTableSparkeyUncompressed *sparkey.HashReader
+	benchTableOnce sync.Once
+	benchTableBit  *bit.Table
 	// benchTableSparkeySnappy       *sparkey.HashReader
 	benchTableCdb *cdb.CDB
 	benchHashmap  map[string]string
@@ -38,7 +36,6 @@ type benchEntry struct {
 
 func loadBenchTable() {
 	benchTableBit = createBitTable(testData)
-	benchTableSparkeyUncompressed = createSparkeyTable(testData, false)
 	// benchTableSparkeySnappy = createSparkeyTable(testData, true)
 	benchTableCdb = createCdbTable(testData)
 	benchHashmap = createInMemoryTable(testData)
@@ -120,56 +117,11 @@ func createBitTable(testDataPath string) *bit.Table {
 		}
 	})
 
-	table, err := builder.Finalize()
-	if err != nil {
+	if err = builder.Finalize(); err != nil {
 		panic(err)
 	}
 
-	return table
-}
-
-func createSparkeyTable(testDataPath string, compressedWithSnappy bool) *sparkey.HashReader {
-	tableFile, err := os.CreateTemp("", "bit-test.*.data")
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		_ = os.Remove(tableFile.Name())
-		_ = os.Remove(tableFile.Name() + ".index")
-	}()
-	if err = tableFile.Close(); err != nil {
-		panic(err)
-	}
-	if err = os.Remove(tableFile.Name()); err != nil {
-		panic(err)
-	}
-
-	var opts *sparkey.Options
-	if compressedWithSnappy {
-		opts.Compression = sparkey.COMPRESSION_SNAPPY
-	}
-	builder, err := sparkey.CreateLogWriter(tableFile.Name(), opts)
-	if err != nil {
-		panic(err)
-	}
-
-	streamTestFile(testDataPath, func(k, v []byte) {
-		if err := builder.Put(k, v); err != nil {
-			panic(err)
-		}
-	})
-
-	if err := builder.Flush(); err != nil {
-		panic(err)
-	}
-	if err := builder.WriteHashFile(sparkey.HASH_SIZE_AUTO); err != nil {
-		panic(err)
-	}
-	if err := builder.Close(); err != nil {
-		panic(err)
-	}
-
-	table, err := sparkey.Open(tableFile.Name())
+	table, err := bit.New(tableFile.Name())
 	if err != nil {
 		panic(err)
 	}
@@ -275,31 +227,6 @@ func BenchmarkMapGet(b *testing.B) {
 //	})
 //}
 
-func BenchmarkSparkeyUncompressedGet(b *testing.B) {
-	benchTableOnce.Do(loadBenchTable)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.RunParallel(func(b *testing.PB) {
-		iter, err := benchTableSparkeyUncompressed.Iterator()
-		if err != nil {
-			panic(err)
-		}
-
-		entryCount := len(benchEntries)
-		i := rand.Int() % entryCount
-		for b.Next() {
-			entry := benchEntries[i]
-			value, err := iter.Get(toBytes(entry.Key))
-			if err != nil || string(value) != entry.Value {
-				panic("bad data or lookup")
-			}
-
-			i = (i + 1) % entryCount
-		}
-	})
-}
-
 func BenchmarkCdbGet(b *testing.B) {
 	benchTableOnce.Do(loadBenchTable)
 
@@ -336,9 +263,8 @@ func toBytes(s string) (b []byte) {
 }
 
 var (
-	benchTableBitCreate     *bit.Table
-	benchTableSparkeyCreate *sparkey.HashReader
-	benchTableCdbCreate     *cdb.CDB
+	benchTableBitCreate *bit.Table
+	benchTableCdbCreate *cdb.CDB
 )
 
 func BenchmarkBitCreate(b *testing.B) {
@@ -347,17 +273,6 @@ func BenchmarkBitCreate(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		benchTableBitCreate = createBitTable(testData)
 		if benchTableBitCreate == nil {
-			b.Fatal("bad data or lookup")
-		}
-	}
-}
-
-func BenchmarkSparkeyCreateUncompressed(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		benchTableSparkeyCreate = createSparkeyTable(testData, false)
-		if benchTableSparkeyCreate == nil {
 			b.Fatal("bad data or lookup")
 		}
 	}
