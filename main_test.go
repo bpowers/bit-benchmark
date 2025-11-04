@@ -121,7 +121,7 @@ func createBitTable(testDataPath string) *bit.Table {
 		panic(err)
 	}
 
-	table, err := bit.New(tableFile.Name())
+	table, err := bit.New(tableFile.Name(), bit.WithMMap(true))
 	if err != nil {
 		panic(err)
 	}
