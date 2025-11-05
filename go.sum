@@ -2,8 +2,12 @@ github.com/Pallinder/go-randomdata v1.1.0 h1:gUubB1IEUliFmzjqjhf+bgkg1o6uoFIkRsP
 github.com/Pallinder/go-randomdata v1.1.0/go.mod h1:yHmJgulpD2Nfrm0cR9tI/+oAgRqCQQixsA8HyRZfV9Y=
 github.com/bpowers/bit v0.0.0-20251104071357-2c5155c2a049 h1:bAvRrYkcH9AkAdKT8qBpCK41ic8GgawtlI8LckLAhSc=
 github.com/bpowers/bit v0.0.0-20251104071357-2c5155c2a049/go.mod h1:dQmE+R1uwHW35jY2knCSSKTmYYw24WKszrWX/9zGF+w=
+github.com/bpowers/bit v0.0.0-20251105041353-82a552746e9e h1:/jj5jvN2InYHrvIZlP7qr1ZvUhiZb5Wf+BoUN8FBLp4=
+github.com/bpowers/bit v0.0.0-20251105041353-82a552746e9e/go.mod h1:h892Dnmw6GWDMNKoc5pRKfSXmb5a4lpSakNW4kl5lmU=
 github.com/bpowers/go-rapidhash v0.0.0-20251104070801-bce48695b4a5 h1:Nnn/fLKUhBivP3CYYodjzMmvWQAhxsykxA9FpnRMNKk=
 github.com/bpowers/go-rapidhash v0.0.0-20251104070801-bce48695b4a5/go.mod h1:nfzJFscz0Tn6yOaJbLNMvWg3CWQr9xkF1Cy0KojYs3k=
+github.com/bpowers/go-rapidhash v0.0.0-20251104151019-7900cb144f83 h1:H7VbPefiW9jBW7m9WTxPDhHYYqEZneJbCF9/lI7i0y0=
+github.com/bpowers/go-rapidhash v0.0.0-20251104151019-7900cb144f83/go.mod h1:nfzJFscz0Tn6yOaJbLNMvWg3CWQr9xkF1Cy0KojYs3k=
 github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70 h1:1uCY1nJQwssamFp/L2rk8rRycjBn0l2nYIrP/pPBRgE=
 github.com/colinmarc/cdb v0.0.0-20190223170904-60f317823f70/go.mod h1:lZuNMoMtkGwujKDy0EndRQBl7owNIHwRq1ycvQeaWqg=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -17,5 +21,7 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec h1:BkDtF2Ih9xZ7le9ndzTA7KJow28VbQW3odyk/8drmuI=
 golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.37.0 h1:fdNQudmxPjkdUTPnLn5mdQv7Zwvbvpaxqs831goi9kQ=
+golang.org/x/sys v0.37.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
